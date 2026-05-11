@@ -1,0 +1,90 @@
+// ============================================================
+// GERMLINE VARIANT CALLING SUBWORKFLOW (WES + WGS SUPPORT)
+// ============================================================
+
+include {
+    CALIBRATE_DRAGSTR_MODEL;
+    GVCF_HAPLOTYPE_CALLER;
+    GENOMICSDB_IMPORT;
+    GENOTYPE_GVCF;
+    COLLECT_AND_VARIANT_FILTERING;
+    CALCULATE_POSTERIORS;
+    HAPLOTYPE_CALLER_EXTRACT_GT as HAPLOTYPE_CALLER_EXTRACT_GT_POST;
+    HAPLOTYPE_CALLER_EXTRACT_GT as HAPLOTYPE_CALLER_EXTRACT_GT_FILTERED
+} from "../modules/HaplotypeCaller.nf"
+
+workflow hc_workflow {
+
+    take:
+        ch_bam       // tuple(val(sample), path(bam), path(bai))
+
+    main:
+        
+        // 1. Prepare Reference Channels
+
+        ch_fasta= Channel.value([
+            file(params.fasta),
+            file("${params.fasta}.fai"),
+            file(params.fasta.replace(".fasta", ".dict").replace(".fa", ".dict")),
+            file(params.fasta.replace(".fasta", ".str").replace(".fa", ".str"))
+
+        ])
+
+        // ============================================================
+        // STEP 1: DRAGSTR CALIBRATION
+        // ============================================================
+
+        ch_dragstr = CALIBRATE_DRAGSTR_MODEL(
+            ch_bam, 
+            ch_fasta, 
+            file(params.bed), 
+            params.interval_padding
+         )
+        // ============================================================
+        // STEP 2: CALLING 
+        // ============================================================
+        
+        ch_gvcfs_out = GVCF_HAPLOTYPE_CALLER(
+            ch_bam.join(ch_dragstr),
+            ch_fasta,
+            file(params.bed),
+            params.interval_padding
+        )
+
+        ch_input_vcf = ch_gvcfs_out.vcf.collect()
+        ch_input_tbi = ch_gvcfs_out.tbi.collect()
+
+        chr_chroms = Channel.of((1..22).collect { "chr${it}" } + ["chrX", "chrY"]).flatten()
+        
+        chr_genomicsdb_vcf = ch_input_vcf.collect()
+        chr_genomicsdb_tbi = ch_input_tbi.collect()
+
+        ch_db = GENOMICSDB_IMPORT(chr_chroms,
+                                    chr_genomicsdb_vcf, 
+                                    chr_genomicsdb_tbi,
+                                    ch_fasta)
+
+        ch_raw_vcf = GENOTYPE_GVCF(ch_db, ch_fasta)
+
+        ch_filtered = COLLECT_AND_VARIANT_FILTERING(
+                                    ch_raw_vcf.vcf.collect(), 
+                                    ch_raw_vcf.tbi.collect(),
+                                    ch_fasta)
+
+        if (params.pedigree) {
+            ch_post = CALCULATE_POSTERIORS(
+                ch_filtered.vcf, 
+                ch_filtered.tbi, 
+                file(params.pedigree)
+            )
+
+            HAPLOTYPE_CALLER_EXTRACT_GT_POST(ch_post.vcf, ch_post.tbi)
+        }
+
+        HAPLOTYPE_CALLER_EXTRACT_GT_FILTERED(ch_filtered.vcf, ch_filtered.tbi)
+
+    emit:
+        hc_vcf = ch_filtered.vcf
+        hc_tbi = ch_filtered.tbi
+        stats = ch_filtered.stats
+}

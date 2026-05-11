@@ -2,4 +2,4 @@
 .nextflow*
 *.Rproj
 deployment/reference/
-deployment/sif
+deployment/singularity/sif/

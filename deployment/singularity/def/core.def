@@ -1,0 +1,125 @@
+Bootstrap: docker
+From: mambaorg/micromamba:1.5.8
+
+########################################################
+# BUILD-TIME FILES
+########################################################
+%files
+    deployment/singularity/locks/core_lock.yml   /opt/build/core_lock.yml
+
+########################################################
+# POST BUILD
+########################################################
+%post
+    set -e
+    cd /
+
+    export DEBIAN_FRONTEND=noninteractive
+    export MAMBA_ROOT_PREFIX=/opt/micromamba
+
+    apt-get update && apt-get install -y \
+        bash \
+        curl \
+        wget \
+        unzip \
+        ca-certificates \
+        bzip2 \
+        coreutils \
+        procps \
+        openjdk-17-jdk \
+        cmake \
+        g++ \
+        gcc \
+        libboost-all-dev \
+        libz-dev \
+        libbz2-dev \
+        liblzma-dev \
+        libgtest-dev \
+        googletest \
+        libc6 \
+        libgomp1 \
+        zlib1g \
+        libnss3 \
+        libgcc-s1 \
+        libblas3 \
+        liblapack3
+
+
+    mkdir -p /opt/envs /opt/build
+
+    export DEBIAN_FRONTEND=noninteractive
+    export MAMBA_ROOT_PREFIX=/opt/micromamba
+
+    ########################################################
+    # 1. INSTALL CONDA-LOCK INTO BASE
+    ########################################################
+    echo "[INFO] Installing conda-lock"
+    micromamba install -y -p $MAMBA_ROOT_PREFIX conda-forge::conda-lock=4.0.0
+    export PATH=$MAMBA_ROOT_PREFIX/bin:$PATH
+
+    ########################################################
+    # 2. INSTALL ENVIRONMENT FROM LOCK FILE
+    ########################################################
+    echo "[INFO] Installing environment from lock file"
+
+    conda-lock install -p /opt/envs/tools /opt/build/core_lock.yml
+
+    micromamba clean -a -y
+
+    ########################################################
+    # 3. GATK (external, SHA pinned)
+    ########################################################
+    GATK_VERSION=4.6.1.0
+    GATK_URL="https://github.com/broadinstitute/gatk/releases/download/${GATK_VERSION}/gatk-${GATK_VERSION}.zip"
+    GATK_SHA256="ac7015c3f0ef1852745ca0ef647adbf8ddef5db63ab485b00bc1ffe654814155"
+
+    mkdir -p /opt/tools/gatk
+    cd /opt/tools/gatk
+
+    wget -q -O gatk.zip "${GATK_URL}"
+    echo "${GATK_SHA256}  gatk.zip" | sha256sum -c -
+
+    unzip -q gatk.zip
+    rm -f gatk.zip
+
+    ln -s /opt/tools/gatk/gatk-${GATK_VERSION}/gatk /usr/local/bin/gatk
+    gatk --version
+
+    ########################################################
+    # 5. DRAGMAP (external, SHA pinned)
+    ########################################################
+    DRAGMAP_VERSION=1.3.0
+    DRAGMAP_URL="https://github.com/Illumina/DRAGMAP/archive/refs/tags/${DRAGMAP_VERSION}.zip"
+    DRAGMAP_SHA256="cabddaa6a57967101fab2c65eab0ce04226359c7926c34c536326eba893246d3"
+    mkdir -p /opt/tools/dragmap
+    cd /opt/tools/dragmap
+
+    wget -q -O dragmap.zip "${DRAGMAP_URL}"
+    echo "${DRAGMAP_SHA256}  dragmap.zip" | sha256sum -c -
+
+    unzip -q dragmap.zip
+    rm -f dragmap.zip
+
+    cd DRAGMAP-${DRAGMAP_VERSION}
+
+    make DRAGEN_OS_VERSION="${DRAGMAP_VERSION}" \
+         CFLAGS="-Wno-error=format-overflow" \
+         CXXFLAGS="-Wno-error=format-overflow"
+
+    ln -s /opt/tools/dragmap/DRAGMAP-${DRAGMAP_VERSION}/build/release/dragen-os /usr/local/bin/dragen-os
+    dragen-os --help
+
+########################################################
+# ENVIRONMENT
+########################################################
+%environment
+    export PATH=/opt/envs/tools/bin:/usr/local/bin:$PATH
+    export XDG_CACHE_HOME=/tmp/.cache
+    export HOME=/tmp
+    export MPLCONFIGDIR=/tmp/.config/matplotlib
+
+########################################################
+# METADATA
+########################################################
+%labels
+    Purpose Core alignment stack (micromamba env.yml + conda-lock audit + GATK external)

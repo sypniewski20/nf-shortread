@@ -1,0 +1,50 @@
+Bootstrap: docker
+From: mambaorg/micromamba:1.5.8
+
+########################################################
+# BUILD-TIME FILES
+########################################################
+%files
+    deployment/singularity/locks/expansionhunter_lock.yml   /opt/build/expansionhunter_lock.yml
+    deployment/singularity/locks/reviewer_lock.yml   /opt/build/reviewer_lock.yml
+
+########################################################
+# POST BUILD
+########################################################
+%post
+    set -e
+    cd /
+
+    export DEBIAN_FRONTEND=noninteractive
+    export MAMBA_ROOT_PREFIX=/opt/micromamba
+
+
+    mkdir -p /opt/envs /opt/build
+
+    export DEBIAN_FRONTEND=noninteractive
+    export MAMBA_ROOT_PREFIX=/opt/micromamba
+
+    ########################################################
+    # 1. INSTALL CONDA-LOCK INTO BASE
+    ########################################################
+    echo "[INFO] Installing conda-lock"
+    micromamba install -y -p $MAMBA_ROOT_PREFIX conda-forge::conda-lock=4.0.0
+    export PATH=$MAMBA_ROOT_PREFIX/bin:$PATH
+
+    ########################################################
+    # 2. INSTALL ENVIRONMENT FROM LOCK FILE
+    ########################################################
+    echo "[INFO] Installing environment from lock file"
+
+    conda-lock install -p /opt/envs/exhunt /opt/build/expansionhunter_lock.yml
+    conda-lock install -p /opt/envs/reviewer /opt/build/reviewer_lock.yml
+
+    micromamba clean -a -y
+
+########################################################
+# ENVIRONMENT
+########################################################
+%environment
+    export PATH=/opt/envs/exhunt/bin:$PATH
+    export PATH=/opt/envs/reviewer/bin:$PATH
+    export PATH=/usr/local/bin:$PATH

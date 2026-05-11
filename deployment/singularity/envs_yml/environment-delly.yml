@@ -1,0 +1,11 @@
+name: delly
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+  - delly=1.7.3
+  - bcftools
+  - tabix
+
+platforms:
+  - linux-64

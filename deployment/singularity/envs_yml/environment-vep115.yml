@@ -1,0 +1,10 @@
+name: vep115
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+  - ensembl-vep=115.2
+  - perl
+  - htslib
+platforms:
+  - linux-64

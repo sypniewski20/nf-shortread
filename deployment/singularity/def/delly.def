@@ -1,0 +1,38 @@
+Bootstrap: docker
+From: mambaorg/micromamba:1.5.8
+
+########################################################
+# BUILD-TIME FILES
+########################################################
+%files
+    deployment/singularity/locks/delly_lock.yml   /opt/build/delly_lock.yml
+
+%post
+    set -e
+
+    export DEBIAN_FRONTEND=noninteractive
+    export MAMBA_ROOT_PREFIX=/opt/micromamba
+
+    apt-get update && apt-get install -y procps
+
+    ########################################################
+    # 1. INSTALL CONDA-LOCK INTO BASE
+    ########################################################
+    echo "[INFO] Installing conda-lock"
+    micromamba install -y -p $MAMBA_ROOT_PREFIX conda-forge::conda-lock=4.0.0
+    export PATH=$MAMBA_ROOT_PREFIX/bin:$PATH
+
+    ########################################################
+    # 2. INSTALL ENVIRONMENT FROM LOCK FILE
+    ########################################################
+    echo "[INFO] Installing environment from lock file"
+
+    conda-lock install -p /opt/envs/delly /opt/build/delly_lock.yml
+
+    micromamba clean -a -y
+
+########################################################
+# ENVIRONMENT
+########################################################
+%environment
+    export PATH=/opt/envs/delly/bin:$PATH
