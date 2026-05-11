@@ -33,32 +33,24 @@ A Nextflow DSL2 pipeline for **IVD-compliant germline variant calling** using GA
 
 ### TO DO
 
-- **TUMOR and TUMOR/GERMLINE with Mutect2 + benchmark with SEQC2**
+- **Tumor-only and tumor/normal calling with Mutect2 + SEQC2 benchmarking**
 - **VEP annotation**
-- **PacBio support? or seperate repo?**
+- **PacBio support (or separate repo?)**
 
 ---
 
 ## Pipeline Architecture
 
-```
 Input Layer
-  ├── FASTQ mode  →  QC (FastQC + fastp)  →  Alignment (DragMap)
-  │     ├── Standard local FASTQ
-  │     └── NIST streaming mode (URL-based, MD5-tagged chunks)
-  └── BAM mode    →  Skip to variant calling
-
-Post-mapping Layer
-  └── DRAGstr calibration  →  Coverage QC (Mosdepth)
-
-Routing Layer (run_mode)
-  ├── HC           →  HaplotypeCaller (DRAGEN-mode)  →  VQSR / filtering
-  ├── SV           →  Manta  +  gCNV
-  └── calibration  →  HC  →  hap.py benchmarking vs NIST truth
-
-Reporting
-  └── MultiQC  (FastQC + flagstat + Mosdepth + variant stats)
-```
+├── FASTQ mode  →  QC (FastQC + fastp)  →  Alignment (DragMap)
+│     ├── Standard local FASTQ
+│     └── NIST streaming mode (URL-based, MD5-tagged chunks)
+└── BAM mode    →  Skip to variant callingPost-mapping Layer
+└── DRAGstr calibration  →  Coverage QC (Mosdepth)Routing Layer (run_mode)
+├── HC           →  HaplotypeCaller (DRAGEN-mode)  →  VQSR / filtering
+├── SV           →  Manta  +  gCNV
+└── calibration  →  HC  →  hap.py benchmarking vs NIST truthReporting
+└── MultiQC  (FastQC + flagstat + Mosdepth + variant stats)
 
 ---
 
@@ -79,7 +71,6 @@ Reporting
 
 ## Repository Structure
 
-```
 nf-ivd/
 ├── main.nf                         # Workflow entry point
 ├── nextflow.config                 # Parameters & profiles
@@ -95,40 +86,16 @@ nf-ivd/
 │   ├── gCNV.nf                     # Copy number variant calling
 │   └── calibration.nf              # GIAB benchmarking
 └── deployment/
-    ├── manifests/                  # Example samplesheets & PED files
-    └── reference/truth/            # NIST v4.2.1 truth VCFs & BEDs
-```
+├── manifests/                  # Example samplesheets & PED files
+└── reference/truth/            # NIST v4.2.1 truth VCFs & BEDs
 
 ---
 
 ## Setup with Make
 
-The `Makefile` automates the full environment setup — building containers, downloading references, and preparing interval lists. All artefacts land under `deployment/`.
+The `Makefile` manages the full clinical environment lifecycle — building containers, downloading references, and verifying all data integrity before use. All artefacts land under `deployment/`.
 
-### Targets
-
-| Target | Description |
-|---|---|
-| `make all` | Runs `setup` + `data` (full environment bootstrap) |
-| `make setup` | Runs `containers`, `strat`, `truth`, `fasta`, `add_resources` |
-| `make containers` | Builds all four Singularity images from `.def` files (or pulls from Docker Hub for `happi.sif`) |
-| `make strat` | Downloads & verifies GIAB stratification BEDs via `download_and_verify.R` |
-| `make truth` | Downloads & verifies NIST v4.2.1 truth VCFs and BEDs |
-| `make fasta` | Downloads the GRCh38 FASTA and builds the DragMap hash table |
-| `make add_resources` | Fetches ploidy priors (GCS), 1000G PoN (GCS), Broad WGS intervals, ENCODE blacklist, and UCSC segmental duplications; then runs `refine_intervals.sh` |
-| `make data` | Downloads Ashkenazim Trio FASTQ reads via `ashkenazim_trio_download.sh` (large — run manually) |
-| `make clean` | Removes outputs, logs, and built `.sif` images |
-
-### Container images built
-
-| Image | Source |
-|---|---|
-| `core.sif` | `deployment/singularity/core.def` (GATK + DragMap) |
-| `qc.sif` | `deployment/singularity/qc.def` (FastQC, fastp, Mosdepth, samtools) |
-| `happi.sif` | `docker://mgibio/hap.py:v0.3.12` |
-| `manta.sif` | `deployment/singularity/manta.def` |
-
-### Typical first-time setup
+### Quick start
 
 ```bash
 # Build containers and download all references (requires gsutil + singularity)
@@ -138,29 +105,54 @@ make setup
 make data
 ```
 
-> `make fasta` also runs `dragen-os --build-hash-table` via `core.sif`, so the FASTA directory must be writable and have sufficient disk space for the hash table.
+### Available targets
+
+| Target | Description |
+|---|---|
+| `make all` | Runs `setup` + `data` (full environment bootstrap) |
+| `make setup` | Runs `containers`, `strat`, `truth`, `fasta`, `add_resources` |
+| `make containers` | Builds all Singularity images from `.def` files (or pulls from Docker Hub for `happi.sif`) |
+| `make fasta` | Downloads GRCh38 FASTA and builds the DragMap hash table |
+| `make truth` | Downloads & verifies NIST v4.2.1 truth VCFs and BEDs for HG002–HG004 |
+| `make strat` | Downloads & verifies GIAB stratification BEDs |
+| `make add_resources` | Fetches ploidy priors, 1000G PoN, Broad WGS intervals, ENCODE blacklist, UCSC segdups; runs `refine_intervals.sh` |
+| `make data` | Downloads Ashkenazim Trio FASTQ reads (large — run manually) |
+| `make clean` | Removes outputs, logs, and built `.sif` images |
+
+### Container images
+
+| Image | Source |
+|---|---|
+| `core.sif` | `deployment/singularity/def/core.def` (GATK + DragMap) — built with `--fakeroot` |
+| `qc.sif` | `deployment/singularity/def/qc.def` (FastQC, fastp, Mosdepth, samtools) — built with `--fakeroot` |
+| `happi.sif` | `docker://mgibio/hap.py:v0.3.12` |
+| `manta.sif` | `deployment/singularity/def/manta.def` |
+
+> `core.sif` and `qc.sif` are built from local definitions using `--fakeroot` to ensure no unverified layers are introduced from external registries.
+
+### Data integrity & verification
+
+All downloads are governed by manifests in `deployment/manifests/`. The setup process calls `scripts/download_and_verify.R`, which compares downloaded file hashes against the manifest CSVs and creates a versioned snapshot to ensure reference data cannot be silently modified post-download.
+
+> `make fasta` also runs `dragen-os --build-hash-table` via `core.sif` — the FASTA directory must be writable and have sufficient disk space for the hash table.
 
 ---
 
 ## Samplesheet Format
 
-The samplesheet is a comma-separated CSV passed to `--samplesheet`. The required columns differ by `--input_type`.
+The samplesheet is a comma-separated CSV passed to `--samplesheet`. Required columns differ by `--input_type`.
 
 ### FASTQ samplesheet (`--input_type fastq`)
 
-Used by `Read_samplesheet()`. All columns are required unless marked optional.
-
 | Column | Description | Required |
 |---|---|---|
-| `SM` | Sample name — used as the grouping key and BAM `SM` read group tag | ✅ |
+| `SM` | Sample name — grouping key and BAM `SM` read group tag | ✅ |
 | `ID` | Read group ID (`RGID`). Falls back to `{SM}_{LB}` if omitted | optional |
 | `LB` | Library name (`RGLB`). Defaults to `unknown_lib` if omitted | optional |
-| `PL` | Sequencing platform (`RGPL`), e.g. `ILLUMINA`. Defaults to `unknown_platform` | optional |
-| `PU` | Platform unit (`RGPU`), e.g. flowcell barcode. Defaults to `unknown_unit` | optional |
+| `PL` | Sequencing platform (`RGPL`), e.g. `ILLUMINA` | optional |
+| `PU` | Platform unit (`RGPU`), e.g. flowcell barcode | optional |
 | `R1` | Path or URL to Read 1 FASTQ (gzipped) | ✅ |
 | `R2` | Path or URL to Read 2 FASTQ (gzipped) | ✅ |
-
-Example:
 
 ```csv
 SM,ID,LB,PL,PU,R1,R2
@@ -172,15 +164,11 @@ For **calibration mode**, `R1`/`R2` can be remote URLs (GIAB FTP/S3). The `ID` f
 
 ### BAM samplesheet (`--input_type bam`)
 
-Used by `Read_bam()`. All three columns are required.
-
 | Column | Description | Required |
 |---|---|---|
-| `sampleID` | Sample identifier — used as the grouping key downstream | ✅ |
+| `sampleID` | Sample identifier | ✅ |
 | `bam` | Path to sorted BAM file | ✅ |
 | `bai` | Path to the corresponding BAM index (`.bai`) | ✅ |
-
-Example:
 
 ```csv
 sampleID,bam,bai
@@ -188,7 +176,7 @@ HG002,/data/HG002.bam,/data/HG002.bam.bai
 HG003,/data/HG003.bam,/data/HG003.bam.bai
 ```
 
-> Both samplesheet readers call `checkIfExists: true`, so the pipeline will fail fast at startup if any file path is invalid.
+> Both samplesheet readers use `checkIfExists: true` — the pipeline will fail fast at startup if any path is invalid.
 
 ---
 
@@ -201,12 +189,12 @@ git clone https://github.com/sypniewski20/nf-ivd.git
 cd nf-ivd
 ```
 
-### 2. Prepare `nextflow.config`
+### 2. Configure paths
 
-Set your local paths for the required parameters:
+Set your local paths in `nextflow.config`:
 
 ```groovy
-params.fasta           = "/path/to/GRCh38.fa"
+params.fasta            = "/path/to/GRCh38.fa"
 params.singularity_path = "/path/to/sif_images"
 ```
 
@@ -275,11 +263,10 @@ All parameters are set in `nextflow.config`. Key options:
 | Parameter | Description | Default |
 |---|---|---|
 | `input_type` | Input data format: `fastq` or `bam` | `fastq` |
-| `run_mode` | Analysis mode (see above) | `germline` |
+| `run_mode` | Analysis mode: `HC`, `SV`, `calibration` | `HC` |
 | `seq_type` | `WGS` or `WES` — affects intervals & DRAGstr calibration | `WGS` |
 | `calling_mode` | `single` or `cohort` (GenomicsDB / GenotypeGVCFs) | `cohort` |
 | `dragen_mode` | Enable DRAGEN-equivalent HMM and parameters | `true` |
-| `joint_calling` | Alias for `calling_mode cohort` | — |
 | `pedigree` | Path to `.ped` file for Bayesian pedigree priors | `null` |
 | `intervals_list` | Genomic regions for parallel scatter | `chr1..M` |
 | `interval_padding` | Padding in bp around WES target intervals | `150` |
@@ -306,19 +293,17 @@ All parameters are set in `nextflow.config`. Key options:
 
 Each run generates a timestamped directory under `--outfolder` (format: `YYYYMMDD_HHMMSS`):
 
-```
 results/
 └── 20250423_120000/
-    ├── bam/            # Sorted, indexed BAMs with full Read Group headers
-    ├── vcf/            # Filtered final VCFs (SNV/indel and/or SV)
-    ├── qc/             # Per-sample FastQC, fastp, flagstat, Mosdepth reports
-    ├── multiqc/        # Aggregated MultiQC HTML report
-    └── logs/
-        ├── execution_timeline.html
-        ├── execution_report.html
-        ├── execution_trace.txt
-        └── pipeline_dag.html
-```
+├── bam/            # Sorted, indexed BAMs with full Read Group headers
+├── vcf/            # Filtered final VCFs (SNV/indel and/or SV)
+├── qc/             # Per-sample FastQC, fastp, flagstat, Mosdepth reports
+├── multiqc/        # Aggregated MultiQC HTML report
+└── logs/
+├── execution_timeline.html
+├── execution_report.html
+├── execution_trace.txt
+└── pipeline_dag.html
 
 ### Clinical integrity checks
 
@@ -333,12 +318,12 @@ results/
 
 The pipeline is pre-configured for benchmarking against the **Ashkenazim Trio (HG002 / HG003 / HG004)** using NIST v4.2.1 truth sets.
 
-1. Download truth VCFs and BEDs (or use `fetch_ajtrio.R`) and place them under `deployment/reference/truth/`.
-2. Point `strat_dir` at your local copy of the GIAB stratification BEDs.
+1. Download truth VCFs and BEDs via `make truth` or `fetch_ajtrio.R` and place them under `deployment/reference/truth/`.
+2. Point `strat_dir` at your local GIAB stratification BEDs.
 3. Run with `--run_mode calibration`.
 4. The pipeline produces `filtered_final.vcf.gz` ready for comparison with `hap.py` or `rtg-tools`.
 
-Truth registry paths (configured in `nextflow.config`):
+Truth registry paths are configured in `nextflow.config`:
 
 ```groovy
 truth {
