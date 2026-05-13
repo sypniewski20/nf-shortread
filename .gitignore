@@ -3,3 +3,4 @@
 *.Rproj
 deployment/reference/
 deployment/singularity/sif/
+lr_stack.txt

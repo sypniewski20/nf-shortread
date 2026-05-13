@@ -1,24 +1,29 @@
-def Read_samplesheet(samplesheet) {
-    // We return the channel object so main.nf can receive it
+def readSamplesheet(samplesheet) {
     return Channel
         .fromPath(samplesheet)
-        .splitCsv(header: true, sep: ',')
+        .splitCsv(header: true, strip: true)
         .map { row ->
-            // Use tuple for clarity in DSL2
+
+            // --- validate required fields ---
+            if (!row.SM) error "Missing SM in samplesheet row: ${row}"
+            if (!row.R1) error "Missing R1 in samplesheet row: ${row}"
+            if (!row.R2) error "Missing R2 in samplesheet row: ${row}"
+
+            def sm = row.SM
+            def lb = row.LB ?: "lib_${sm}"
+            def id = row.ID ?: "${sm}_${lb}"    
+            def pl = row.PL ?: "ILLUMINA"       
+            def pu = row.PU ?: "${id}.unknown"  
+
             tuple(
-                row.SM,
-                row.ID ?: "${row.SM}_${row.LB}",
-                row.LB ?: "unknown_lib",
-                row.PL ?: "unknown_platform",
-                row.PU ?: "unknown_unit",
-                file(row.R1, checkIfExists: true), 
+                sm, id, lb, pl, pu,
+                file(row.R1, checkIfExists: true),
                 file(row.R2, checkIfExists: true)
-                
             )
         }
 }
 
-def Read_bam(bam_sheet) {
+def readBam(bam_sheet) {
 
     Channel
         .fromPath(bam_sheet)

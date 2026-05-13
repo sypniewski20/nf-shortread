@@ -54,7 +54,7 @@ process GVCF_HAPLOTYPE_CALLER {
     label 'gatk'
 
     input:
-        tuple val(sample), path(bam), path(bai), path(dragstr)
+        tuple val(sample), path(bam), path(bai), path(dragstr_model)
         tuple path(fasta), path(fai), path(fasta_dict), path(str_table)
         path(bed)
         val(interval_padding)
@@ -63,6 +63,7 @@ process GVCF_HAPLOTYPE_CALLER {
         path("${sample}.g.vcf.gz"), emit: vcf
         path("${sample}.g.vcf.gz.tbi"), emit: tbi
     script:
+        def dragstr_arg = dragstr_model.name != "NO_FILE" ? "--dragstr-params ${dragstr_model}" : ""
     """
     gatk --java-options "${GLOBAL_JAVA_OPTS}" HaplotypeCaller \
         -R ${fasta} \
@@ -71,7 +72,7 @@ process GVCF_HAPLOTYPE_CALLER {
         -L ${bed} \
         --interval-set-rule INTERSECTION \
         --interval-padding ${padding} \
-        --dragstr-params-path ${dragstr} \
+        ${dragstr_arg} \
         --smith-waterman FASTEST_AVAILABLE \
         ${GATK_GLOBAL_ARGS} \
         -ERC GVCF

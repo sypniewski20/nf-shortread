@@ -31,21 +31,27 @@ workflow hc_workflow {
         ])
 
         // ============================================================
-        // STEP 1: DRAGSTR CALIBRATION
+        // STEP 1: DRAGSTR CALIBRATION (if WGS)
         // ============================================================
 
-        ch_dragstr = CALIBRATE_DRAGSTR_MODEL(
-            ch_bam, 
-            ch_fasta, 
-            file(params.bed), 
-            params.interval_padding
-         )
+        if (params.seq_type == 'WGS') {
+            ch_bam_input = CALIBRATE_DRAGSTR_MODEL(
+                ch_bam,
+                ch_fasta,
+                file(params.bed),
+                params.interval_padding
+            )
+        } else {
+            ch_bam_input = ch_bam.map { sample, bam, bai -> [sample, bam, bai, file("NO_FILE")] }
+        }
+
+
         // ============================================================
         // STEP 2: CALLING 
         // ============================================================
         
         ch_gvcfs_out = GVCF_HAPLOTYPE_CALLER(
-            ch_bam.join(ch_dragstr),
+            ch_bam_input,
             ch_fasta,
             file(params.bed),
             params.interval_padding

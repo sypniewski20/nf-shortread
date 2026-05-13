@@ -6,7 +6,7 @@ nextflow.enable.dsl = 2
 // CLINICAL IVD GERMLINE PIPELINE
 // ============================================================
 
-include { Read_samplesheet; Read_bam }      from './modules/functions.nf'
+include { readSamplesheet; readBam }      from './modules/functions.nf'
 include { dragmap_workflow }      from './subworkflows/mapping.nf' 
 include { fastq_QC_workflow; mosdepth_workflow; multiqc_workflow }     from './subworkflows/qc.nf'
 include { hc_workflow }           from './subworkflows/HC.nf'
@@ -32,14 +32,14 @@ workflow {
         // --- NEW LOGIC FOR CALIBRATION / STREAMING MODE ---
         if ('calibration' in run_modes) {
             // 1. Parse the NIST-style samplesheet (URLs + MD5 as RGID)
-            ch_raw_stream = Read_samplesheet(params.samplesheet)
+            ch_raw_stream = readSamplesheet(params.samplesheet)
 
             // 4. Align grouped chunks into single Sample BAMs
             mapping_results = dragmap_workflow(ch_raw_stream)
 
         } else {
             // --- STANDARD LOCAL FASTQ MODE ---
-            ch_fq = Read_samplesheet(params.samplesheet)
+            ch_fq = readSamplesheet(params.samplesheet)
             ch_fq_qc = fastq_QC_workflow(ch_fq)
 
             filtered_fq = ch_fq_qc.fastq
@@ -68,7 +68,7 @@ workflow {
         multiqc_workflow(multiqc_input)
 
     } else if (params.input_type == 'bam') {
-        ch_bam = Read_bam(params.samplesheet)
+        ch_bam = readBam(params.samplesheet)
     }
 
     ch_final_vcf = Channel.empty()
