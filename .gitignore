@@ -1,6 +1,9 @@
 .git
 .nextflow*
 *.Rproj
-deployment/reference/
-deployment/singularity/sif/
+deployment/reference
+deployment/singularity/sif
+deployment/benchmark/bams
+deployment/benchmark/truth_vcfs
+deployment/benchmark/trio_benchmark_results
 lr_stack.txt

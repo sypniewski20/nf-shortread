@@ -10,11 +10,11 @@ include { readSamplesheet; readBam }      from './modules/functions.nf'
 include { dragmap_workflow }      from './subworkflows/mapping.nf' 
 include { fastq_QC_workflow; mosdepth_workflow; multiqc_workflow }     from './subworkflows/qc.nf'
 include { hc_workflow }           from './subworkflows/HC.nf'
+include { deepvariant_workflow } from './subworkflows/deepvariant.nf'
 include { manta_workflow }        from './subworkflows/manta.nf'
 include {delly_workflow }         from './subworkflows/delly.nf'
 include {cnvkit_workflow }         from './subworkflows/cnvkit.nf'
 include { gCNV_workflow }         from './subworkflows/gCNV.nf'
-include { germline_calibration_workflow }  from './subworkflows/calibration.nf'
 include { annotation_workflow } from './subworkflows/annotation.nf'
 
 def run_modes = params.run_mode?.split(',')*.trim()
@@ -29,25 +29,16 @@ workflow {
 
     if (params.input_type == 'fastq') {
         
-        // --- NEW LOGIC FOR CALIBRATION / STREAMING MODE ---
-        if ('calibration' in run_modes) {
-            // 1. Parse the NIST-style samplesheet (URLs + MD5 as RGID)
-            ch_raw_stream = readSamplesheet(params.samplesheet)
 
-            // 4. Align grouped chunks into single Sample BAMs
-            mapping_results = dragmap_workflow(ch_raw_stream)
-
-        } else {
             // --- STANDARD LOCAL FASTQ MODE ---
-            ch_fq = readSamplesheet(params.samplesheet)
-            ch_fq_qc = fastq_QC_workflow(ch_fq)
+        ch_fq = readSamplesheet(params.samplesheet)
+        ch_fq_qc = fastq_QC_workflow(ch_fq)
 
-            filtered_fq = ch_fq_qc.fastq
-            qc_results = ch_fq_qc.fastp
-            ch_fastqc_reports = ch_fq_qc.fastqc
+        filtered_fq = ch_fq_qc.fastq
+        qc_results = ch_fq_qc.fastp
+        ch_fastqc_reports = ch_fq_qc.fastqc
 
-            mapping_results = dragmap_workflow(filtered_fq)
-        }
+        mapping_results = dragmap_workflow(filtered_fq)
 
         // --- COMMON POST-MAPPING LAYER ---
         mosdepth_results = mosdepth_workflow(mapping_results.ch_bam)
@@ -60,7 +51,8 @@ workflow {
             .mix(
                 ch_fastqc_reports,
                 ch_mapping_stats,
-                ch_mosdepth
+                ch_mosdepth,
+                qc_results
             )
             .flatten()
             .collect()
@@ -69,6 +61,9 @@ workflow {
 
     } else if (params.input_type == 'bam') {
         ch_bam = readBam(params.samplesheet)
+
+        ch_mosdepth = mosdepth_workflow(ch_bam).ch_mosdepth.collect()
+        multiqc_workflow(ch_mosdepth)
     }
 
     ch_final_vcf = Channel.empty()
@@ -76,42 +71,28 @@ workflow {
 
     hc_results = null
 
-    if ('SNV' in run_modes || 'calibration' in run_modes) {
+    if ('HC' in run_modes) {
         
         hc_results = hc_workflow(ch_bam)
-        ch_final_vcf = hc_results.hc_vcf
-        ch_final_tbi = hc_results.hc_tbi
-
-        annotation_workflow(ch_final_vcf, ch_final_tbi)
+        annotation_workflow(hc_results.ch_vcf, hc_results.ch_tbi)
         
     }
 
-    bams_count = ch_bam.map { sample, bam, bai -> bam }.count()
+    if ('DV' in run_modes) {
+
+        deepvariant_workflow(ch_bam)
+        annotation_workflow(deepvariant_workflow.out.ch_vcf, deepvariant_workflow.out.ch_tbi)
+
+    }
     
     if ('SV' in run_modes) {
         manta_workflow(ch_bam)
         delly_workflow(ch_bam)
         cnvkit_workflow(ch_bam)
-    
-        // Gate ch_bam: only emit if count >= 40, otherwise emit empty
-        ch_bam_for_gcnv = ch_bam
-            .combine(bams_count)
-            .filter { sample, bam, bai, count ->
-                if (count < 40) {
-                    log.warn("Skipping gCNV: samples < 40 (got ${count})")
-                    return false
-                }
-                return true
-            }
-            .map { sample, bam, bai, count -> [sample, bam, bai] }
-    
-        gCNV_workflow(ch_bam_for_gcnv)
     }
 
-    if ('calibration' in run_modes) {
-
-        germline_calibration_workflow(hc_results.hc_vcf)
-
+    if ('gCNV' in run_modes) {
+        gCNV_workflow(ch_bam)
     }
 
 }

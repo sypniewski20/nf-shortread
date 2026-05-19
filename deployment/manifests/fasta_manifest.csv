@@ -2,4 +2,7 @@ dataset,url,md5
 fasta,https://storage.googleapis.com/gcp-public-data--broad-references/hg38/v0/Homo_sapiens_assembly38.fasta,7ff134953dcca8c8997453bbb80b6b5e
 fai,https://storage.googleapis.com/gcp-public-data--broad-references/hg38/v0/Homo_sapiens_assembly38.fasta.fai,f76371b113734a56cde236bc0372de0a
 dict,https://storage.googleapis.com/gcp-public-data--broad-references/hg38/v0/Homo_sapiens_assembly38.dict,3884c62eb0e53fa92459ed9bff133ae6
+ann,https://storage.googleapis.com/gcp-public-data--broad-references/hg38/v0/Homo_sapiens_assembly38.fasta.ann,af611ed0bb9487fb1ba4aa1a7e7ad21c
+amb,https://storage.googleapis.com/gcp-public-data--broad-references/hg38/v0/Homo_sapiens_assembly38.fasta.amb,e4dc4fdb7358198e0847106599520aa9
+bwt,https://storage.googleapis.com/gcp-public-data--broad-references/hg38/v0/Homo_sapiens_assembly38.fasta.bwt,d482797878660258d533f09afaf59929
 str_table,https://storage.googleapis.com/gcp-public-data--broad-references/hg38/v0/Homo_sapiens_assembly38.str,dfbd3c9d92f1c73cd10c37db7be5ef27

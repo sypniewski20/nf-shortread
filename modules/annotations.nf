@@ -12,9 +12,17 @@ process SPLICE_AI {
 		tuple path("${vcf.baseName}_spliceAI.vcf.gz"), path("${vcf.baseName}_spliceAI.vcf.gz.tbi")
 	script:
       def genome = (fasta.name =~ /(?i)GRCh38|hg38|Homo_sapiens_assembly38/) ? "grch38" : "grch37"
+      def distance = params.spliceai_distance ?: 50
+      
 		"""
 
-        spliceai -I ${vcf} -O ${vcf.baseName}_spliceAI.vcf -R ${fasta} -A ${genome}
+        spliceai -I ${vcf} \
+                 -O ${vcf.baseName}_spliceAI.vcf \
+                 -R ${fasta} \
+                 -A ${genome} \
+                 -D ${distance}
+
+
         bgzip ${vcf.baseName}_spliceAI.vcf
         tabix -p vcf ${vcf.baseName}_spliceAI.vcf.gz
 

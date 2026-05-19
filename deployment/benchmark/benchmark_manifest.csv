@@ -1,0 +1,4 @@
+sampleID,bam,bai
+HG002,deployment/benchmark/bams/HG002.novaseq.pcr-free.35x.dedup.grch38_no_alt.chr20.bam,deployment/benchmark/bams/HG002.novaseq.pcr-free.35x.dedup.grch38_no_alt.chr20.bam.bai
+HG003,deployment/benchmark/bams/HG003.novaseq.pcr-free.35x.dedup.grch38_no_alt.chr20.bam,deployment/benchmark/bams/HG003.novaseq.pcr-free.35x.dedup.grch38_no_alt.chr20.bam.bai
+HG004,deployment/benchmark/bams/HG004.novaseq.pcr-free.35x.dedup.grch38_no_alt.chr20.bam,deployment/benchmark/bams/HG004.novaseq.pcr-free.35x.dedup.grch38_no_alt.chr20.bam.bai

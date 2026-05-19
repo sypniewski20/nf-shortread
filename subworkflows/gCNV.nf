@@ -22,6 +22,14 @@ workflow gCNV_workflow {
             file(params.fasta.replace(".fasta", ".dict").replace(".fa", ".dict"))
         ])
 
+        ch_bam
+            .count()
+            .subscribe { count ->
+                if (count < 40) {
+                    log.warn "gCNV: running with only ${count} samples (recommended >= 40, results may be unreliable)"
+                }
+            }
+
         bed            = Channel.value(file(params.bed))
         ploidy_priors  = Channel.value(file(params.ploidy_priors))
 

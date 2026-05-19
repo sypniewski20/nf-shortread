@@ -7,18 +7,13 @@ R           ?= Rscript
 RSCRIPT = Rscript
 
 # ── Dirs ──────────────────────────────────────────────────────────────────────
-DEPLOYMENT_DIR :=deployment
+DEPLOYMENT_DIR := deployment
 REF_DIR    := ${DEPLOYMENT_DIR}/reference
-STRAT_DIR  := $(REF_DIR)/giab_stratifications
-TRUTH_DIR  := $(REF_DIR)/truth
-READS_DIR  := $(REF_DIR)/reads
 FASTA_DIR  := $(REF_DIR)/fasta
 ADD_RESOURCES    := $(REF_DIR)/additional_resources
+BENCHMARK_DIR := ${DEPLOYMENT_DIR}/benchmark
 
 # ── Manifests ─────────────────────────────────────────────────────────────────
-STRAT_MANIFEST := ${DEPLOYMENT_DIR}/manifests/giab_strat_manifest.csv
-TRUTH_MANIFEST := ${DEPLOYMENT_DIR}/manifests/truth_manifest.csv
-READS_MANIFEST := ${DEPLOYMENT_DIR}/manifests/reads_manifest.csv
 FASTA_MANIFEST := ${DEPLOYMENT_DIR}/manifests/fasta_manifest.csv
 
 # ── Images ────────────────────────────────────────────────────────────────────
@@ -32,8 +27,20 @@ CNVKIT_SIF := ${DEPLOYMENT_DIR}/singularity/sif/cnvkit.sif
 VEP_SIF := ${DEPLOYMENT_DIR}/singularity/sif/vep115.sif
 STR_SIF := ${DEPLOYMENT_DIR}/singularity/sif/str.sif
 SPLICEAI_SIF := deploment/singularity/sif/spliceai.sif
+DEEP_VARIANT_SIF := ${DEPLOYMENT_DIR}/singularity/sif/deepvariant.sif
+GLNEXUS_SIF := ${DEPLOYMENT_DIR}/singularity/sif/glnexus.sif
 
 HAPPY_DOCKER := docker://mgibio/hap.py:v0.3.12
+DEEP_VARIANT_DOCKER := docker://google/deepvariant:1.5.0
+
+# ── Fasta ───────────────────────────────────────────────────────
+
+FASTA_URL := https://storage.googleapis.com/gcp-public-data--broad-references/hg38/v0/Homo_sapiens_assembly38.fasta \
+FAI_URL := https://storage.googleapis.com/gcp-public-data--broad-references/hg38/v0/Homo_sapiens_assembly38.fasta.fai \
+ANN_URL := https://storage.googleapis.com/gcp-public-data--broad-references/hg38/v0/Homo_sapiens_assembly38.fasta.ann \
+AMB_URL := https://storage.googleapis.com/gcp-public-data--broad-references/hg38/v0/Homo_sapiens_assembly38.fasta.amb \
+BWT_URL := https://storage.googleapis.com/gcp-public-data--broad-references/hg38/v0/Homo_sapiens_assembly38.fasta.bwt \
+STR_URL := https://storage.googleapis.com/gcp-public-data--broad-references/hg38/v0/Homo_sapiens_assembly38.str \
 
 # ── Additional Resources ───────────────────────────────────────────────────────
 PLOIDY_PRIORS := gs://gatk-sv-resources-public/hg38/v0/sv-resources/resources/v1/hg38.contig_ploidy_priors_homo_sapiens.tsv
@@ -44,16 +51,16 @@ UCSC_SEGDUPS := https://hgdownload.soe.ucsc.edu/goldenPath/hg38/database/genomic
 
 ########################################################
 
-.PHONY: all setup containers \
-        strat truth fasta \
-        validate clean data
+.PHONY: all setup containers fasta add_resources benchmark_download run_benchmark
 
 all: setup data
 
-setup: containers strat truth fasta add_resources
+setup: containers fasta add_resources
+
+benchmark: benchmark_download run_benchmark
 
 # ── Containers ────────────────────────────────────────────────────────────────
-containers: $(CORE_SIF) $(QC_SIF) $(HAPPY_SIF) $(MANTA_SIF)
+containers: $(CORE_SIF) $(QC_SIF) $(HAPPY_SIF) $(MANTA_SIF) $(DEEP_VARIANT_SIF) $(GLNEXUS_SIF)
 
 $(CORE_SIF):
 	$(SINGULARITY) build --fakeroot $@ ${DEPLOYMENT_DIR}/singularity/def/core.def
@@ -82,16 +89,24 @@ $(STR_SIF):
 $(SPLICEAI_SIF):
 	$(SINGULARITY) build --fakeroot $@ ${DEPLOYMENT_DIR}/singularity/def/spliceai.def
 
-# ── References ────────────────────────────────────────────────────────────────
-strat:
-	$(RSCRIPT) scripts/download_and_verify.R --manifest $(STRAT_MANIFEST) --dir $(STRAT_DIR) --snapshot_dir $(STRAT_DIR)
+$(DEEP_VARIANT_SIF):
+	$(SINGULARITY) build --disable-cache $@ $(DEEP_VARIANT_DOCKER)
 
-truth:
-	$(RSCRIPT) scripts/download_and_verify.R --manifest $(TRUTH_MANIFEST) --dir $(TRUTH_DIR) --snapshot_dir $(TRUTH_DIR)
+$(GLNEXUS_SIF):
+	$(SINGULARITY) build --fakeroot $@ ${DEPLOYMENT_DIR}/singularity/def/glnexus.def
+
+
+
+# ── References ────────────────────────────────────────────────────────────────
 
 fasta:
-	$(RSCRIPT) ${DEPLOYMENT_DIR}/scripts/download_and_verify.R --manifest $(FASTA_MANIFEST) --dir $(FASTA_DIR) --snapshot_dir $(FASTA_DIR)
-
+	$(WGET) -P ${FASTA_DIR} ${FASTA_URL}
+	$(WGET) -P ${FASTA_DIR} ${FAI_URL}
+	$(WGET) -P ${FASTA_DIR} ${ANN_URL}
+	$(WGET) -P ${FASTA_DIR} ${AMB_URL}
+	$(WGET) -P ${FASTA_DIR} ${BWT_URL}
+	$(WGET) -P ${FASTA_DIR} ${STR_URL}
+	
 	# Build the hash table for the reference FASTA file
 	$(SINGULARITY) run $(CORE_SIF) dragen-os --build-hash-table true \
 											 --ht-reference ${FASTA_DIR}/*.fasta  \
@@ -114,10 +129,41 @@ add_resources:
 															$(ADD_RESOURCES)
 
 
-# ── Reads (manual step — too large for default pipeline) ─────────────────────
-data:
-	${DEPLOYMENT_DIR}/scripts/ashkenazim_trio_download.sh ${READS_DIR}
+benchmark_download:
+	bash ${DEPLOYMENT_DIR}/scripts/GiAB_download.sh $(BENCHMARK_DIR)
+
+run_benchmark:
+	nextflow run main.nf \
+		--input_type bam \
+		--seq_type WGS \
+		--run_mode DV \
+		-profile singularity \
+		--singularity_path ${DEPLOYMENT_DIR}/singularity/sif \
+		--samplesheet ${DEPLOYMENT_DIR}/benchmark/benchmark_manifest.csv \
+		--outfolder ${DEPLOYMENT_DIR}/benchmark/trio_benchmark_results \
+		--runID test_run \
+		-resume \
+		-w ${DEPLOYMENT_DIR}/benchmark/trio_benchmark_results/work \
+		--seq_type WGS \
+		--fasta ${DEPLOYMENT_DIR}/reference/fasta/Homo_sapiens_assembly38.fasta \
+		--bed ${DEPLOYMENT_DIR}/reference/fasta/wgs_calling_regions.hg38.interval_list
+
+		for i in HG002 HG003 HG004
+		do
+
+			singularity run -B ${DEPLOYMENT_DIR} ${DEPLOYMENT_DIR}/singularity/sif/happi.sif \
+				opt/hap.py/bin/hap.py \
+  				/benchmark/${i}_GRCh38_1_22_v4.2.1_benchmark.vcf.gz \
+  				${DEPLOYMENT_DIR}/benchmark/trio_benchmark_results/deepvariant/${i}_deepvariant.vcf.gz \
+  				-f /${DEPLOYMENT_DIR}/benchmark/truth_vcfs/${i}_GRCh38_1_22_v4.2.1_benchmark_noinconsistent.bed \
+  				-r /${DEPLOYMENT_DIR}/reference/fasta/Homo_sapiens_assembly38.fasta \
+  				-o ${DEPLOYMENT_DIR}/benchmark/trio_benchmark_results/${i}_happy.output \
+  				--engine=vcfeval \
+  				--pass-only \
+  				-l chr20
+
+		done
 
 # ── Clean ─────────────────────────────────────────────────────────────────────
 clean:
-	rm -rf $(OUTPUT_DIR) reference logs singularity/*.sif
+	rm -rf ${DEPLOYMENT_DIR}/benchmark/trio_benchmark_results reference logs singularity/*.sif

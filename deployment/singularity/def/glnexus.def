@@ -5,24 +5,15 @@ From: mambaorg/micromamba:1.5.8
 # BUILD-TIME FILES
 ########################################################
 %files
-    deployment/singularity/locks/spliceai_lock.yml   /opt/build/spliceai_lock.yml
+    deployment/singularity/locks/glnexus_lock.yml   /opt/build/glnexus_lock.yml
 
-########################################################
-# POST BUILD
-########################################################
 %post
     set -e
-    cd /
 
     export DEBIAN_FRONTEND=noninteractive
     export MAMBA_ROOT_PREFIX=/opt/micromamba
 
     apt-get update && apt-get install -y procps
-
-    mkdir -p /opt/envs /opt/build
-
-    export DEBIAN_FRONTEND=noninteractive
-    export MAMBA_ROOT_PREFIX=/opt/micromamba
 
     ########################################################
     # 1. INSTALL CONDA-LOCK INTO BASE
@@ -36,7 +27,7 @@ From: mambaorg/micromamba:1.5.8
     ########################################################
     echo "[INFO] Installing environment from lock file"
 
-    conda-lock install -p /opt/envs/spliceai /opt/build/spliceai_lock.yml
+    conda-lock install -p /opt/envs/glnexus /opt/build/glnexus_lock.yml
 
     micromamba clean -a -y
 
@@ -44,5 +35,4 @@ From: mambaorg/micromamba:1.5.8
 # ENVIRONMENT
 ########################################################
 %environment
-    export PATH=/opt/envs/spliceai/bin:$PATH
-    export PATH=/usr/local/bin:$PATH
+    export PATH=/opt/envs/glnexus/bin:$PATH
