@@ -1,4 +1,6 @@
-include { DRAGMAP_BAM; MARK_DUPLICATES } from '../modules/mapping.nf'
+include { DRAGMAP_BAM; 
+          BWA_BAM;
+          MARK_DUPLICATES } from '../modules/mapping.nf'
 
 // ==========================
 // MULTIQC
@@ -15,8 +17,15 @@ workflow dragmap_workflow {
         file("${params.fasta}.fai")
         ])
 
-        DRAGMAP_BAM(ch_fq, ch_fasta)
-        MARK_DUPLICATES(DRAGMAP_BAM.out)
+        if (params.mapper == 'dragmap') {
+            ch_bam = DRAGMAP_BAM(ch_fq, ch_fasta)
+        } else if (params.mapper == 'bwa') {
+            ch_bam = BWA_BAM(ch_fq, ch_fasta)
+        } else {
+            error "Unsupported mapper specified: ${params.mapper}. Supported mappers are 'dragmap' and 'bwa'."
+        }
+
+        MARK_DUPLICATES(ch_bam)
     
     emit:
 

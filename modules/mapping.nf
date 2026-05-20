@@ -35,6 +35,44 @@ process DRAGMAP_BAM {
         """
 }
 
+process BWA_BAM {
+    tag "${sample}"
+    label 'gatk'
+    label 'xlarge'
+    input:
+        tuple val(sample), val(ID), val(LB), val(PL), val(PU), path(read_1), path(read_2)
+        tuple path(fasta_dir), path(fasta), path(fasta_fai)
+
+    output:
+        tuple val(sample), path("${sample}_sorted.bam"), path("${sample}_sorted.bam.bai")
+
+    script:
+        def rg_id = (ID && ID.trim()) ? ID : [sample, LB, PU].findAll { it && it.trim() }.join('_')
+        def rg_line = "@RG\\tID:${rg_id}\\tSM:${sample}\\tLB:${LB}\\tPL:${PL}\\tPU:${PU}"
+        """
+        #!/bin/bash
+        set -eo pipefail
+        
+		bwa mem -t ${task.cpus} \
+			-R ${rg_line} \
+			${fasta} \
+			${read_1} \
+			${read_2} | \
+		samtools view --reference ${fasta} \
+					  --threads ${task.cpus} -b | \
+		samtools sort -@ ${task.cpus} \
+					  -O bam > ${sample}_sorted.bam
+
+		gatk MarkDuplicates \
+		      -I ${sample}_sorted.bam \
+		      -O ${sample}_sorted_markdups.bam \
+		      -M marked_dup_metrics.txt
+
+        samtools index -@ ${task.cpus} ${sample}_sorted_markdups.bam
+        
+        """
+}
+
 process MARK_DUPLICATES {
     publishDir "${params.outfolder}/${params.runID}/BAM/${sample}", mode: 'copy', overwrite: true
     tag "${sample}"
