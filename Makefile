@@ -60,7 +60,7 @@ setup: containers fasta add_resources
 benchmark: benchmark_download run_benchmark
 
 # ── Containers ────────────────────────────────────────────────────────────────
-containers: $(CORE_SIF) $(QC_SIF) $(HAPPY_SIF) $(MANTA_SIF) $(DEEP_VARIANT_SIF) $(GLNEXUS_SIF)
+containers: $(CORE_SIF) $(QC_SIF) $(HAPPY_SIF) $(MANTA_SIF) $(DEEP_VARIANT_SIF) $(GLNEXUS_SIF) $(VEP_SIF)
 
 $(CORE_SIF):
 	$(SINGULARITY) build --fakeroot $@ ${DEPLOYMENT_DIR}/singularity/def/core.def
@@ -146,23 +146,11 @@ run_benchmark:
 		-w ${DEPLOYMENT_DIR}/benchmark/trio_benchmark_results/work \
 		--seq_type WGS \
 		--fasta ${DEPLOYMENT_DIR}/reference/fasta/Homo_sapiens_assembly38.fasta \
-		--bed ${DEPLOYMENT_DIR}/reference/fasta/wgs_calling_regions.hg38.interval_list
+		--bed ${DEPLOYMENT_DIR}/reference/fasta/wgs_calling_regions.hg38.interval_list \
+		--annotate false
 
-		for i in HG002 HG003 HG004
-		do
-
-			singularity run -B ${DEPLOYMENT_DIR} ${DEPLOYMENT_DIR}/singularity/sif/happi.sif \
-				opt/hap.py/bin/hap.py \
-  				/benchmark/${i}_GRCh38_1_22_v4.2.1_benchmark.vcf.gz \
-  				${DEPLOYMENT_DIR}/benchmark/trio_benchmark_results/deepvariant/${i}_deepvariant.vcf.gz \
-  				-f /${DEPLOYMENT_DIR}/benchmark/truth_vcfs/${i}_GRCh38_1_22_v4.2.1_benchmark_noinconsistent.bed \
-  				-r /${DEPLOYMENT_DIR}/reference/fasta/Homo_sapiens_assembly38.fasta \
-  				-o ${DEPLOYMENT_DIR}/benchmark/trio_benchmark_results/${i}_happy.output \
-  				--engine=vcfeval \
-  				--pass-only \
-  				-l chr20
-
-		done
+validate:
+	bash ${DEPLOYMENT_DIR}/benchmark/validate.sh ${DEPLOYMENT_DIR}
 
 # ── Clean ─────────────────────────────────────────────────────────────────────
 clean:

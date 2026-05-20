@@ -18,6 +18,7 @@ From: mambaorg/micromamba:1.5.8
     export DEBIAN_FRONTEND=noninteractive
     export MAMBA_ROOT_PREFIX=/opt/micromamba
 
+    apt-get update && apt-get install -y procps
 
     mkdir -p /opt/envs /opt/build
 

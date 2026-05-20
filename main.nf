@@ -74,14 +74,20 @@ workflow {
     if ('HC' in run_modes) {
         
         hc_results = hc_workflow(ch_bam)
-        annotation_workflow(hc_results.ch_vcf, hc_results.ch_tbi)
+
+        if (params.annotate == true) {
+            annotation_workflow(hc_results.ch_vcf, hc_results.ch_tbi)
+        }
         
     }
 
     if ('DV' in run_modes) {
 
-        deepvariant_workflow(ch_bam)
-        annotation_workflow(deepvariant_workflow.out.ch_vcf, deepvariant_workflow.out.ch_tbi)
+        dv_results = deepvariant_workflow(ch_bam)
+
+        if (params.annotate == true) {
+            annotation_workflow(dv_results.ch_vcf, dv_results.ch_tbi)
+        }
 
     }
     

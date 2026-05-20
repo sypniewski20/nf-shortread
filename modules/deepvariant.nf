@@ -38,7 +38,7 @@ process GLNEXUS {
 		glnexus_cli \
 		--threads ${task.cpus} \
 		--config DeepVariant${params.seq_type} \
-		${vcf} > glnexus_deepvariant.bcf
+		${gvcf} > glnexus_deepvariant.bcf
 
 		"""
 
@@ -57,8 +57,10 @@ process NORM_MULTISAMPLE {
 	script:
 		"""
 
-        bcftools norm -f ${fasta} -m -any ${bcf} -Ou | \
-        bcftools +fill-tags -Ou -- -t AC,AF,AN | \
+        bcftools norm -a --atom-overlaps . -m - -f ${fasta} ${bcf} -Ou | \
+        bcftools view -f PASS -Ou | \
+        bcftools annotate --set-id +'%CHROM\\_%POS\\_%REF\\_%ALT' -Ou | \
+        bcftools +fill-tags -Ou -- -t AF,AC | \
         bcftools sort -Oz -o norm_${bcf.simpleName}.vcf.gz
 
         tabix -p vcf norm_${bcf.simpleName}.vcf.gz
