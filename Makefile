@@ -35,12 +35,9 @@ DEEP_VARIANT_DOCKER := docker://google/deepvariant:1.5.0
 
 # ── Fasta ───────────────────────────────────────────────────────
 
-FASTA_URL := https://storage.googleapis.com/gcp-public-data--broad-references/hg38/v0/Homo_sapiens_assembly38.fasta \
-FAI_URL := https://storage.googleapis.com/gcp-public-data--broad-references/hg38/v0/Homo_sapiens_assembly38.fasta.fai \
-ANN_URL := https://storage.googleapis.com/gcp-public-data--broad-references/hg38/v0/Homo_sapiens_assembly38.fasta.ann \
-AMB_URL := https://storage.googleapis.com/gcp-public-data--broad-references/hg38/v0/Homo_sapiens_assembly38.fasta.amb \
-BWT_URL := https://storage.googleapis.com/gcp-public-data--broad-references/hg38/v0/Homo_sapiens_assembly38.fasta.bwt \
-STR_URL := https://storage.googleapis.com/gcp-public-data--broad-references/hg38/v0/Homo_sapiens_assembly38.str \
+FASTA_URL := https://storage.googleapis.com/gcp-public-data--broad-references/hg38/v0/Homo_sapiens_assembly38.fasta
+FAI_URL := https://storage.googleapis.com/gcp-public-data--broad-references/hg38/v0/Homo_sapiens_assembly38.fasta.fai
+STR_URL := https://storage.googleapis.com/gcp-public-data--broad-references/hg38/v0/Homo_sapiens_assembly38.str 
 
 # ── Additional Resources ───────────────────────────────────────────────────────
 PLOIDY_PRIORS := gs://gatk-sv-resources-public/hg38/v0/sv-resources/resources/v1/hg38.contig_ploidy_priors_homo_sapiens.tsv
@@ -100,17 +97,22 @@ $(GLNEXUS_SIF):
 # ── References ────────────────────────────────────────────────────────────────
 
 fasta:
-	$(WGET) -P ${FASTA_DIR} ${FASTA_URL}
-	$(WGET) -P ${FASTA_DIR} ${FAI_URL}
-	$(WGET) -P ${FASTA_DIR} ${ANN_URL}
-	$(WGET) -P ${FASTA_DIR} ${AMB_URL}
-	$(WGET) -P ${FASTA_DIR} ${BWT_URL}
-	$(WGET) -P ${FASTA_DIR} ${STR_URL}
+	mkdir -p $(FASTA_DIR)
 	
-	# Build the hash table for the reference FASTA file
-	$(SINGULARITY) run $(CORE_SIF) dragen-os --build-hash-table true \
-											 --ht-reference ${FASTA_DIR}/*.fasta  \
-											 --output-directory ${FASTA_DIR}
+	# Download references
+	$(WGET) -P $(FASTA_DIR) $(FASTA_URL)
+	$(WGET) -P $(FASTA_DIR) $(FAI_URL)
+	$(WGET) -P $(FASTA_DIR) $(STR_URL)
+
+	# Build bwa index
+	$(SINGULARITY) run $(CORE_SIF) \
+		bwa index $(FASTA_DIR)/Homo_sapiens_assembly38.fasta 
+
+	# Build the DRAGEN hash table
+	$(SINGULARITY) run $(CORE_SIF) \
+		dragen-os --build-hash-table true \
+		--ht-reference $(FASTA_DIR)/Homo_sapiens_assembly38.fasta \
+		--output-directory $(FASTA_DIR)
 
 add_resources:
 	$(GSUTIL) cp ${PLOIDY_PRIORS} ${ADD_RESOURCES}/
@@ -133,7 +135,8 @@ benchmark_download:
 	bash ${DEPLOYMENT_DIR}/scripts/GiAB_download.sh $(BENCHMARK_DIR)
 
 run_benchmark:
-	nextflow run main.nf \
+	mkdir -p "${DEPLOYMENT_DIR}/benchmark/trio_benchmark_results/logs"
+	nextflow -log "${DEPLOYMENT_DIR}/benchmark/trio_benchmark_results/logs/nextflow.log" run main.nf \
 		--input_type bam \
 		--seq_type WGS \
 		--run_mode DV \

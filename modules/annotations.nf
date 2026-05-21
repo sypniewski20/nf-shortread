@@ -30,55 +30,62 @@ process SPLICE_AI {
 
 }
 
-process VEP_SNV {
+process VEP_GERMLINE_SNV {
     publishDir "${params.outfolder}/${params.runID}/vep/", mode: 'copy', overwrite: true
     label 'vep'
-	label 'mem_36GB'
-	label 'core_36'
-	input:
-		path(vcf)
-        path(tbi)
+    label 'mem_36GB'
+    label 'core_36'
+
+    input:
+        path(vcf)
+        path(tbi)                                      // staged for co-location only
         tuple path(spliceai_vcf), path(spliceai_tbi)
         tuple path(fasta), path(fai)
-	output:
-		path("${vcf.baseName}.vep.tsv.gz")
-	script:
-      def genome = (fasta.name =~ /(?i)GRCh38|hg38|Homo_sapiens_assembly38/) ? "GRCh38" : "GRCh37"
-		"""
 
+    output:
+        path("${vcf.baseName}.vep.tsv.gz")
+
+    script:
+        def genome  = (fasta.name =~ /(?i)GRCh38|hg38|Homo_sapiens_assembly38/) ? "GRCh38" : "GRCh37"
+        def clinvar = params.clinvar
+            ? "--custom file=${params.clinvar},short_name=ClinVar,format=vcf,type=exact,coords=0,fields=CLNSIG%CLNREVSTAT%CLNDN%MC%CLNDISDB%CLNDISDBINC"
+            : ""
+        def dbNSFP  = params.dbNSFP
+            ? "--plugin dbNSFP,${params.dbNSFP},MetaRNN,AlphaMissense,MANE,VEP_canonical,gnomAD4.1_joint_NFE_AF,gnomAD4.1_joint_AF"
+            : ""
+        """
         vep \
-        --cache \
-        --dir_cache ${params.vep_cache} \
-        --species homo_sapiens \
-        --assembly ${genome} \
-        --buffer_size 10000000 \
-        -i ${vcf} \
-        -o "${vcf.baseName}.vep.tsv.gz" \
-        --format vcf \
-        --compress_output bgzip \
-        --fasta ${fasta} \
-        --tab \
-        --fork ${task.cpus} \
-        --force_overwrite \
-        --hgvs \
-        --hgvsg \
-        --symbol \
-        --numbers \
-        --domains \
-        --protein \
-        --biotype \
-        --uniprot \
-        --variant_class \
-        --custom file=${params.clinvar},short_name=ClinVar,format=vcf,type=exact,coords=0,fields=CLNSIG%CLNREVSTAT%CLNDN%MC%CLNDISDB%CLNDISDBINC \
-        --custom file=${spliceai_vcf},short_name=SpliceAI,format=vcf,type=exact,coords=0,fields=ALLELE%SYMBOL%DS_AG%DS_AL%DS_DG%DS_DL \
-        --plugin dbNSFP,${params.dbNSFP},MetaRNN,AlphaMissense,MANE,VEP_canonical,gnomAD4.1_joint_NFE_AF,gnomAD4.1_joint_AF \
-        --offline \
-	    --cache_version ${params.cache_version} \
-        --flag_pick \
-        --pick_order mane_select,mane_plus_clinical,canonical,tsl,biotype,rank
-        
-		"""
-
+            --cache \
+            --dir_cache ${params.vep_cache} \
+            --species homo_sapiens \
+            --assembly ${genome} \
+            --buffer_size 50000 \
+            --input_file ${vcf} \
+            --output_file "${vcf.baseName}.vep.tsv.gz" \
+            --format vcf \
+            --compress_output bgzip \
+            --fasta ${fasta} \
+            --tab \
+            --no_stats \
+            --fork ${task.cpus} \
+            --force_overwrite \
+            --hgvs \
+            --hgvsg \
+            --symbol \
+            --numbers \
+            --domains \
+            --protein \
+            --biotype \
+            --uniprot \
+            --variant_class \
+            --custom file=${spliceai_vcf},short_name=SpliceAI,format=vcf,type=overlap,coords=0,fields=ALLELE%SYMBOL%DS_AG%DS_AL%DS_DG%DS_DL \
+            ${clinvar} \
+            ${dbNSFP} \
+            --offline \
+            --cache_version ${params.cache_version} \
+            --flag_pick \
+            --pick_order mane_select,mane_plus_clinical,canonical,tsl,biotype,rank
+        """
 }
 
 process FILTER_VEP {

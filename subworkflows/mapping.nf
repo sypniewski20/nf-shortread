@@ -11,16 +11,30 @@ workflow dragmap_workflow {
         ch_fq
     main:
 
-        ch_fasta = Channel.value([
-        file(params.fasta).parent,
-        file(params.fasta),
-        file("${params.fasta}.fai")
-        ])
-
         if (params.mapper == 'dragmap') {
+
+            ch_fasta = Channel.value([
+            file(params.fasta).parent,
+            file(params.fasta),
+            file("${params.fasta}.fai")
+            ])
+
             ch_bam = DRAGMAP_BAM(ch_fq, ch_fasta)
+
         } else if (params.mapper == 'bwa') {
+
+            ch_fasta = Channel.value([
+            file(params.fasta),
+            file("${params.fasta}.fai"),
+            file("${params.fasta}.amb"),
+            file("${params.fasta}.ann"),
+            file("${params.fasta}.bwt"),
+            file("${params.fasta}.sa"),
+            file("${params.fasta}.pac")
+            ])
+
             ch_bam = BWA_BAM(ch_fq, ch_fasta)
+
         } else {
             error "Unsupported mapper specified: ${params.mapper}. Supported mappers are 'dragmap' and 'bwa'."
         }

@@ -1,5 +1,5 @@
 include {
-    VEP_SNV; SPLICE_AI; FILTER_VEP
+    VEP_GERMLINE_SNV; SPLICE_AI; FILTER_VEP
 } from '../modules/annotations.nf'
 
 workflow annotation_workflow {
@@ -17,12 +17,12 @@ workflow annotation_workflow {
                   ch_tbi,
                   ch_fasta)
 
-        VEP_SNV(ch_vcf, 
+        VEP_GERMLINE_SNV(ch_vcf, 
                 ch_tbi,
                 SPLICE_AI.out,
                 ch_fasta
                 )
         
-        FILTER_VEP(VEP_SNV.out)
+        FILTER_VEP(VEP_GERMLINE_SNV.out)
 
 }

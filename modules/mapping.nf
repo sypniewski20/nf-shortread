@@ -41,7 +41,7 @@ process BWA_BAM {
     label 'xlarge'
     input:
         tuple val(sample), val(ID), val(LB), val(PL), val(PU), path(read_1), path(read_2)
-        tuple path(fasta_dir), path(fasta), path(fasta_fai)
+        tuple path(fasta), path(fasta_fai), path(fasta_amb), path(fasta_ann), path(fasta_bwt), path(fasta_sa), path(fasta_pac)
 
     output:
         tuple val(sample), path("${sample}_sorted.bam"), path("${sample}_sorted.bam.bai")
@@ -54,7 +54,7 @@ process BWA_BAM {
         set -eo pipefail
         
 		bwa mem -t ${task.cpus} \
-			-R ${rg_line} \
+			-R "${rg_line}" \
 			${fasta} \
 			${read_1} \
 			${read_2} | \
@@ -62,13 +62,6 @@ process BWA_BAM {
 					  --threads ${task.cpus} -b | \
 		samtools sort -@ ${task.cpus} \
 					  -O bam > ${sample}_sorted.bam
-
-		gatk MarkDuplicates \
-		      -I ${sample}_sorted.bam \
-		      -O ${sample}_sorted_markdups.bam \
-		      -M marked_dup_metrics.txt
-
-        samtools index -@ ${task.cpus} ${sample}_sorted_markdups.bam
         
         """
 }
