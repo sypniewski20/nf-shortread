@@ -44,12 +44,11 @@ workflow {
         mosdepth_results = mosdepth_workflow(mapping_results.ch_bam)
         
         ch_bam           = mapping_results.ch_bam
-        ch_mapping_stats = mapping_results.ch_metrics.collect()
-        ch_mosdepth      = mosdepth_results.ch_mosdepth.collect()
+        ch_mapping_stats = mapping_results.ch_metrics
+        ch_mosdepth      = mosdepth_results.ch_mosdepth
 
         multiqc_input = Channel.empty()
             .mix(
-                ch_fastqc_reports,
                 ch_mapping_stats,
                 ch_mosdepth,
                 qc_results

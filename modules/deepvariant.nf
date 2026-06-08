@@ -24,14 +24,13 @@ process DEEP_VARIANT {
 }
 
 process GLNEXUS {
-    publishDir "${params.outfolder}/${params.runID}/deep_variant", mode: 'copy', overwrite: true
     label 'glnexus'
     label 'large'
 	input:
 		path(gvcf)
 		path(gvcf_tbi)
 	output:
-		path("glnexus_deepvariant.bcf")
+		tuple val(sample), path("glnexus_deepvariant.bcf"), path("glnexus_deepvariant.csi"), emit: vcf
 	script:
 		"""
 
@@ -39,6 +38,8 @@ process GLNEXUS {
 		--threads ${task.cpus} \
 		--config DeepVariant${params.seq_type} \
 		${gvcf} > glnexus_deepvariant.bcf
+
+        tabix -p bcf glnexus_deepvariant.bcf
 
 		"""
 
@@ -49,7 +50,7 @@ process NORM_MULTISAMPLE {
     label 'gatk'
     label 'large'
 	input:
-		path(bcf)
+		tuple path(bcf), path(csi)
         tuple path(fasta), path(fai)
 	output:
 		path("norm_${bcf.simpleName}.vcf.gz"), emit: vcf
@@ -58,7 +59,6 @@ process NORM_MULTISAMPLE {
 		"""
 
         bcftools norm -a --atom-overlaps . -m - -f ${fasta} ${bcf} -Ou | \
-        bcftools view -f PASS -Ou | \
         bcftools annotate --set-id +'%CHROM\\_%POS\\_%REF\\_%ALT' -Ou | \
         bcftools +fill-tags -Ou -- -t AF,AC | \
         bcftools sort -Oz -o norm_${bcf.simpleName}.vcf.gz

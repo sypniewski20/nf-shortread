@@ -62,6 +62,8 @@ process BWA_BAM {
 					  --threads ${task.cpus} -b | \
 		samtools sort -@ ${task.cpus} \
 					  -O bam > ${sample}_sorted.bam
+
+        samtools index -@ ${task.cpus} ${sample}_sorted.bam
         
         """
 }
