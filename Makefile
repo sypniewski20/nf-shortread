@@ -28,7 +28,6 @@ VEP_SIF := ${DEPLOYMENT_DIR}/singularity/sif/vep115.sif
 STR_SIF := ${DEPLOYMENT_DIR}/singularity/sif/str.sif
 SPLICEAI_SIF := deploment/singularity/sif/spliceai.sif
 DEEP_VARIANT_SIF := ${DEPLOYMENT_DIR}/singularity/sif/deepvariant.sif
-GLNEXUS_SIF := ${DEPLOYMENT_DIR}/singularity/sif/glnexus.sif
 
 HAPPY_DOCKER := docker://mgibio/hap.py:v0.3.12
 DEEP_VARIANT_DOCKER := docker://google/deepvariant:1.5.0
@@ -88,11 +87,6 @@ $(SPLICEAI_SIF):
 
 $(DEEP_VARIANT_SIF):
 	$(SINGULARITY) build --disable-cache $@ $(DEEP_VARIANT_DOCKER)
-
-$(GLNEXUS_SIF):
-	$(SINGULARITY) build --fakeroot $@ ${DEPLOYMENT_DIR}/singularity/def/glnexus.def
-
-
 
 # ── References ────────────────────────────────────────────────────────────────
 

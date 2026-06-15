@@ -1,9 +1,0 @@
-name: glnexus
-channels:
-  - conda-forge
-  - bioconda
-dependencies:
-  - glnexus=1.4.1
-
-platforms:
-  - linux-64
