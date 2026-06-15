@@ -8,6 +8,7 @@ dependencies:
   - bcftools 
   - perl=5.32.1
   - bedtools=2.31.1
+  - glnexus=1.4.1
   - pip
   - fastprogress=1.0.3
 platforms:

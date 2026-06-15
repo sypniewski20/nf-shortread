@@ -13,57 +13,46 @@ process DEEP_VARIANT {
         tuple val(sample), path("${sample}_deepvariant.gvcf.gz"), path("${sample}_deepvariant.gvcf.gz.tbi"), emit: gvcf
     script:
         """
+        mkdir -p tmp
+
         /opt/deepvariant/bin/run_deepvariant \
         --model_type ${params.seq_type} \
         --ref ${fasta} \
         --reads ${bam} \
         --output_vcf ${sample}_deepvariant.vcf.gz \
         --output_gvcf ${sample}_deepvariant.gvcf.gz \
-        --num_shards ${task.cpus}
+        --num_shards ${task.cpus} \
+        --tmp_dir tmp
         """
 }
 
 process GLNEXUS {
-    label 'glnexus'
+    publishDir "${params.outfolder}/${params.runID}/deep_variant", mode: 'copy', overwrite: true
+
+    label 'core'
     label 'large'
 	input:
 		path(gvcf)
 		path(gvcf_tbi)
+        tuple path(fasta), path(fai)
 	output:
-		tuple val(sample), path("glnexus_deepvariant.bcf"), path("glnexus_deepvariant.csi"), emit: vcf
-	script:
+		path("norm_glnexus_deepvariant.vcf.gz"), emit: vcf
+        path("norm_glnexus_deepvariant.vcf.gz.tbi"), emit: tbi
+    script:
 		"""
+
+        LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libjemalloc.so
 
 		glnexus_cli \
 		--threads ${task.cpus} \
 		--config DeepVariant${params.seq_type} \
-		${gvcf} > glnexus_deepvariant.bcf
-
-        tabix -p bcf glnexus_deepvariant.bcf
-
-		"""
-
-}
-
-process NORM_MULTISAMPLE {
-    publishDir "${params.outfolder}/${params.runID}/deep_variant", mode: 'copy', overwrite: true
-    label 'gatk'
-    label 'large'
-	input:
-		tuple path(bcf), path(csi)
-        tuple path(fasta), path(fai)
-	output:
-		path("norm_${bcf.simpleName}.vcf.gz"), emit: vcf
-        path("norm_${bcf.simpleName}.vcf.gz.tbi"), emit: tbi
-	script:
-		"""
-
-        bcftools norm -a --atom-overlaps . -m - -f ${fasta} ${bcf} -Ou | \
+		${gvcf} | \
+        bcftools norm -a --atom-overlaps . -m - -f ${fasta} -Ou | \
         bcftools annotate --set-id +'%CHROM\\_%POS\\_%REF\\_%ALT' -Ou | \
         bcftools +fill-tags -Ou -- -t AF,AC | \
-        bcftools sort -Oz -o norm_${bcf.simpleName}.vcf.gz
+        bcftools sort -Oz -o norm_glnexus_deepvariant.vcf.gz
 
-        tabix -p vcf norm_${bcf.simpleName}.vcf.gz
+        tabix -p vcf norm_glnexus_deepvariant.vcf.gz
 
 		"""
 

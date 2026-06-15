@@ -27,6 +27,7 @@ From: mambaorg/micromamba:1.5.8
         g++ \
         gcc \
         libboost-all-dev \
+        libjemalloc-dev \
         libz-dev \
         libbz2-dev \
         liblzma-dev \

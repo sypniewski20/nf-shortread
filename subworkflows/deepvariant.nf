@@ -1,7 +1,6 @@
 include {
     DEEP_VARIANT;
     GLNEXUS;
-    NORM_MULTISAMPLE;
     DV_EXTRACT_GT
 } from '../modules/deepvariant.nf'
 
@@ -25,13 +24,11 @@ workflow deepvariant_workflow {
                                     .map{sample, gvcf, tbi -> tbi}
                                     .collect()
 
-        GLNEXUS(ch_gvcf, ch_gvcf_tbi)
+        GLNEXUS(ch_gvcf, ch_gvcf_tbi, ch_fasta)
 
-        NORM_MULTISAMPLE(GLNEXUS.out, ch_fasta)
-
-        DV_EXTRACT_GT(NORM_MULTISAMPLE.out.vcf, NORM_MULTISAMPLE.out.tbi)
+        DV_EXTRACT_GT(GLNEXUS.out.vcf, GLNEXUS.out.tbi)
 
     emit:
-        ch_vcf = NORM_MULTISAMPLE.out.vcf
-        ch_tbi = NORM_MULTISAMPLE.out.tbi
+        ch_vcf = GLNEXUS.out.vcf
+        ch_tbi = GLNEXUS.out.tbi
 }
