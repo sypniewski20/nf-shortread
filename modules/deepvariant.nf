@@ -22,7 +22,7 @@ process DEEP_VARIANT {
         --output_vcf ${sample}_deepvariant.vcf.gz \
         --output_gvcf ${sample}_deepvariant.gvcf.gz \
         --num_shards ${task.cpus} \
-        --tmp_dir tmp
+        --intermediate_results_dir tmp
         """
 }
 
